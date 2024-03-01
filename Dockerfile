@@ -12,7 +12,7 @@ ENV LANG C.UTF-8
 # 设置工作目录，也就是下面执行 ENTRYPOINT 后面命令的路径
 WORKDIR /code/Server
 # 根据requirement.txt下载好依赖包
-RUN /usr/local/bin/pip3 install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+RUN /usr/local/bin/pip3 install --progress-bar off -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 # 根据requirement.txt下载好依赖包
 # EXPOSE 指令是声明运行时容器提供服务端口，这只是一个声明，在运行时并不会因为这个声明应用就会开启这个端口的服务。
 # 此处填写8000，是因为我们上面的app.py提供的web服务就需要使用8000端口
