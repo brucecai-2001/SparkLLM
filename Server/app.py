@@ -5,15 +5,13 @@ from SparkApi import SparkAI
 
 #Flask server
 app = Flask(__name__)
-moonShot_client = MoonShotAI()
-Spark_client = SparkAI()
-
 
 # Use Spark LLM
 @app.route('/Spark',methods=['GET', 'POST'])
 def Spark_callback():
     data = request.get_json(silent=True)
     query = data['query']
+    Spark_client = SparkAI()
     response = Spark_client.chat_once(query)
     return jsonify({"response": response})
 
@@ -23,6 +21,7 @@ def Spark_callback():
 def MoonShot_callback():
     data = request.get_json(silent=True)
     query = data['query']
+    moonShot_client = MoonShotAI()
     response = moonShot_client.chat_once(query)
     return jsonify({"response": response})
 
