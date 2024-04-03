@@ -24,7 +24,6 @@ def MoonShot_callback():
     data = request.get_json(silent=True)
     query = data['query']
     response = moonShot_client.chat_once(query)
-    
     return jsonify({"response": response})
 
 

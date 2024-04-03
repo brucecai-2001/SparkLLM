@@ -99,6 +99,7 @@ class SparkAI:
     # 收到websocket关闭的处理
     def on_close(self,ws,one,two):
         print(" ")
+        self.answer = ""
 
 
     # 收到websocket连接建立的处理
@@ -148,5 +149,4 @@ class SparkAI:
         ws.domain = self.domain
         ws.question = req
         ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
-        self.answer = ""
         return self.answer
