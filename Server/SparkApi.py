@@ -13,17 +13,24 @@ from wsgiref.handlers import format_date_time
 
 import websocket  # 使用websocket_client
 
-answer = ""
+from config import Configuration
 
-class Ws_Param(object):
-    # 初始化
-    def __init__(self, APPID, APIKey, APISecret, Spark_url):
-        self.APPID = APPID
-        self.APIKey = APIKey
-        self.APISecret = APISecret
-        self.host = urlparse(Spark_url).netloc
-        self.path = urlparse(Spark_url).path
-        self.Spark_url = Spark_url
+
+class SparkAI:
+    def __init__(self):
+        config = Configuration("Server/llm.xml")
+        spark_config = config.get_config("Spark")
+        self.appid = spark_config.get("appid") 
+        self.api_key = spark_config.get("api_key") 
+        self.api_secret = spark_config.get("api_secret") 
+        self.Spark_url = spark_config.get("Spark_url") 
+        self.domain = spark_config.get("domain") 
+        self.host = urlparse(self.Spark_url).netloc
+        self.path = urlparse(self.Spark_url).path
+
+        self.answer = ""
+
+
 
     # 生成url
     def create_url(self):
@@ -37,12 +44,12 @@ class Ws_Param(object):
         signature_origin += "GET " + self.path + " HTTP/1.1"
 
         # 进行hmac-sha256进行加密
-        signature_sha = hmac.new(self.APISecret.encode('utf-8'), signature_origin.encode('utf-8'),
+        signature_sha = hmac.new(self.api_secret.encode('utf-8'), signature_origin.encode('utf-8'),
                                  digestmod=hashlib.sha256).digest()
 
         signature_sha_base64 = base64.b64encode(signature_sha).decode(encoding='utf-8')
 
-        authorization_origin = f'api_key="{self.APIKey}", algorithm="hmac-sha256", headers="host date request-line", signature="{signature_sha_base64}"'
+        authorization_origin = f'api_key="{self.api_key}", algorithm="hmac-sha256", headers="host date request-line", signature="{signature_sha_base64}"'
 
         authorization = base64.b64encode(authorization_origin.encode('utf-8')).decode(encoding='utf-8')
 
@@ -56,85 +63,90 @@ class Ws_Param(object):
         url = self.Spark_url + '?' + urlencode(v)
         # 此处打印出建立连接时候的url,参考本demo的时候可取消上方打印的注释，比对相同参数时生成的url与自己代码生成的url是否一致
         return url
+    
 
 
-# 收到websocket错误的处理
-def on_error(ws, error):
-    print("### error:", error)
-
-
-# 收到websocket关闭的处理
-def on_close(ws,one,two):
-    print(" ")
-
-
-# 收到websocket连接建立的处理
-def on_open(ws):
-    thread.start_new_thread(run, (ws,))
-
-
-def run(ws, *args):
-    data = json.dumps(gen_params(appid=ws.appid, domain= ws.domain,question=ws.question))
-    ws.send(data)
-
-
-# 收到websocket消息的处理
-def on_message(ws, message):
-    # print(message)
-    data = json.loads(message)
-    code = data['header']['code']
-    if code != 0:
-        print(f'请求错误: {code}, {data}')
-        ws.close()
-    else:
-        choices = data["payload"]["choices"]
-        status = choices["status"]
-        content = choices["text"][0]["content"]
-        print(content,end ="")
-        global answer
-        answer += content
-        # print(1)
-        if status == 2:
-            ws.close()
-
-
-def gen_params(appid, domain,question):
-    """
-    通过appid和用户的提问来生成请参数
-    """
-    data = {
-        "header": {
-            "app_id": appid,
-            "uid": "1234"
-        },
-        "parameter": {
-            "chat": {
-                "domain": domain,
-                "temperature": 0.5,
-                "max_tokens": 2048
-            }
-        },
-        "payload": {
-            "message": {
-                "text": question
-            }
+    def gen_params(self,appid,domain,query):
+        """
+        通过appid和用户的提问来生成请参数
+        """
+        data = {
+                "header": {
+                    "app_id": appid,
+                    "uid": "1234"
+                },
+                "parameter": {
+                    "chat": {
+                        "domain": domain,
+                        "temperature": 0.5,
+                        "max_tokens": 2048
+                    }
+                },
+                "payload": {
+                    "message": {
+                        "text": query
+                    }
+                }
         }
-    }
-    return data
+        return data
+    
+
+    # 收到websocket错误的处理
+    def on_error(self,ws, error):
+        print("### error:", error)
 
 
+    # 收到websocket关闭的处理
+    def on_close(self,ws,one,two):
+        print(" ")
 
-def request(appid, api_key, api_secret, Spark_url,domain, question):
-    # print("星火:")
-    global answer
-    answer = ""
-    wsParam = Ws_Param(appid, api_key, api_secret, Spark_url)
-    #websocket.enableTrace(False)
-    wsUrl = wsParam.create_url()
-    ws = websocket.WebSocketApp(wsUrl, on_message=on_message, on_error=on_error, on_close=on_close, on_open=on_open)
-    ws.appid = appid
-    ws.question = question
-    ws.domain = domain
-    ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
-    return answer
 
+    # 收到websocket连接建立的处理
+    def on_open(self, ws):
+        thread.start_new_thread(self.run, (ws,))
+
+
+    # 收到websocket消息的处理
+    def on_message(self, ws, message):
+        # print(message)
+        data = json.loads(message)
+        code = data['header']['code']
+        if code != 0:
+            print(f'请求错误: {code}, {data}')
+            ws.close()
+        else:
+            choices = data["payload"]["choices"]
+            status = choices["status"]
+            content = choices["text"][0]["content"]
+            print(content,end ="")
+            self.answer += content
+            # print(1)
+            if status == 2:
+                ws.close()
+
+
+    def run(self, ws, *args):
+        data = json.dumps(self.gen_params(appid=ws.appid, domain= ws.domain,query=ws.question))
+        ws.send(data)
+
+    
+    def chat_once(self, query):
+        req = []
+        jsoncon_system = {}
+        jsoncon_system["role"] = "system"
+        jsoncon_system["content"] = "你是一个虚拟助手，你擅长解决问题并提供简洁的回复，最长的回复不超过100字。"
+        req.append(jsoncon_system)
+
+        jsoncon_user = {}
+        jsoncon_user["role"] = "user"
+        jsoncon_user["content"] = query
+        req.append(jsoncon_user)
+
+        wsUrl = self.create_url()
+        ws = websocket.WebSocketApp(wsUrl, on_message=self.on_message, on_error=self.on_error, on_close=self.on_close, on_open=self.on_open)
+        ws.appid = self.appid
+        ws.domain = self.domain
+        ws.question = req
+        ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
+        self.answer = ""
+        return self.answer
